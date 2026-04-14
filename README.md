@@ -1,181 +1,116 @@
 # LLM Observability Lite
 
-A lightweight observability platform for LLM applications — traces, metrics, cost tracking, and latency analytics. Built in Python with FastAPI.
+> Drop-in observability for LLM apps. Traces, cost tracking, latency, and eval — without the enterprise price tag.
 
-## Features
+[![Status](https://img.shields.io/badge/status-scaffolded-yellow)](#)
+[![Language](https://img.shields.io/badge/language-Go-blue)](#)
+[![License](https://img.shields.io/badge/license-MIT-green)](#)
 
-- **Trace Logging** — Log every LLM request with tokens, latency, cost, cache hits
-- **Analytics Dashboard** — Real-time dashboard with requests, cost, latency, error rate
-- **Time-Series Data** — Hourly/daily aggregations of request volume and spend
-- **Top Models** — Ranked view of models by usage and cost
-- **Percentiles** — p50, p95, p99 latency breakdown
-- **Eval Tracking** — Log and query evaluation results (LLM-as-judge, etc.)
-- **SQLite Storage** — Zero-dependency persistence, no external DB needed
-- **Rate Limiting** — Per-API-key rate limiting out of the box
+## What Is This?
+
+LLM Observability Lite gives developers visibility into their LLM applications:
+
+- **Traces** — Every LLM call: prompt, model, response, latency, tokens, cost
+- **Cost Tracking** — Real-time USD spend per model, per endpoint, per workspace
+- **Latency Monitoring** — p50/p95/p99 latency histograms per model
+- **Evaluation** — Track pass@k, faithfulness, and custom metrics over time
+- **Alerting** — Slack/email when cost or latency spikes (Pro)
 
 ## Quick Start
 
+### 1. Clone & Setup
+
 ```bash
-# Clone
 git clone https://github.com/sj221097/llm-observability-lite.git
 cd llm-observability-lite
 
 # Copy env
 cp .env.example .env
+# Edit .env with your keys
 
 # Run with Docker Compose
 docker compose up
 ```
 
-Dashboard: `http://localhost:8080`
-API: `http://localhost:8080/api/v1`
-
-## API Reference
-
-### Log a Trace
+### 2. Send Traces
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/traces \
-  -H "Authorization: Bearer sk-obs-key-1" \
+curl -X POST http://localhost:8080/v1/trace \
+  -H "Authorization: Bearer <your-api-key>" \
   -H "Content-Type: application/json" \
   -d '{
-    "trace_id": "req-001",
+    "trace_id": "req_abc123",
     "model": "gpt-4o-mini",
     "provider": "openai",
-    "prompt_tokens": 100,
-    "completion_tokens": 50,
-    "total_tokens": 150,
+    "prompt_tokens": 150,
+    "completion_tokens": 80,
     "latency_ms": 450,
-    "cost_usd": 0.0003,
-    "cache_hit": false
+    "cost_usd": 0.00105,
+    "status": "success",
+    "metadata": {
+      "user_id": "user_42",
+      "endpoint": "/chat"
+    }
   }'
 ```
 
-### Get Summary Stats
+### 3. View Dashboard
 
-```bash
-curl "http://localhost:8080/api/v1/analytics/summary" \
-  -H "Authorization: Bearer sk-obs-key-1"
+Dashboard at `http://localhost:3000` — simple trace table + stats.
+
+## Architecture
+
+```
+Ingest (HTTP/WS) → Go Server → PostgreSQL (traces) + Redis (cache)
+                            ↓
+                    Billing (Stripe webhooks)
+                            ↓
+                      Dashboard (Next.js)
 ```
 
-### Get Time Series
+## Project Structure
 
-```bash
-curl "http://localhost:8080/api/v1/analytics/timeseries?start_time=2026-04-08T00:00:00&end_time=2026-04-09T00:00:00&bucket_minutes=60" \
-  -H "Authorization: Bearer sk-obs-key-1"
 ```
-
-### Get Top Models
-
-```bash
-curl "http://localhost:8080/api/v1/analytics/top-models?limit=5" \
-  -H "Authorization: Bearer sk-obs-key-1"
-```
-
-### Get Latency Percentiles
-
-```bash
-curl "http://localhost:8080/api/v1/analytics/percentiles" \
-  -H "Authorization: Bearer sk-obs-key-1"
-```
-
-### List Recent Traces
-
-```bash
-curl "http://localhost:8080/api/v1/traces?limit=20" \
-  -H "Authorization: Bearer sk-obs-key-1"
-```
-
-### Log an Eval
-
-```bash
-curl -X POST http://localhost:8080/api/v1/evals \
-  -H "Authorization: Bearer sk-obs-key-1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "trace_id": "req-001",
-    "eval_name": "faithfulness",
-    "score": 0.92,
-    "passed": true,
-    "details": {"method": "llm-as-judge"}
-  }'
+llm-observability-lite/
+├── cmd/server/          # Main entry point
+├── internal/
+│   ├── config/          # Env config loading
+│   ├── handlers/        # HTTP handlers
+│   ├── middleware/      # Auth, logging, rate-limit
+│   ├── models/          # Data models
+│   ├── storage/         # PostgreSQL repository
+│   ├── tracing/         # Trace ingestion logic
+│   ├── billing/         # Stripe integration
+│   └── auth/            # API key + JWT auth
+├── pkg/llm/             # LLM cost/pricing utilities
+├── migrations/          # SQL migrations
+├── deploy/              # Docker + compose files
+└── README.md
 ```
 
 ## Configuration
 
 | Variable | Default | Description |
-|---|---|---|
-| `HOST` | 0.0.0.0 | Server host |
+|----------|---------|-------------|
 | `PORT` | 8080 | Server port |
-| `DATABASE_URL` | sqlite+aiosqlite:///./observability.db | Database connection URL |
-| `RETENTION_DAYS` | 30 | Data retention period |
-| `RATE_LIMIT_REQUESTS` | 100 | Max requests per window |
-| `RATE_LIMIT_WINDOW_SECONDS` | 60 | Rate limit window |
-| `API_KEYS` | sk-obs-key-1 | Comma-separated API keys |
-| `CORS_ORIGINS` | * | Allowed CORS origins |
+| `DATABASE_URL` | — | PostgreSQL connection string |
+| `REDIS_URL` | `redis://localhost:6379/0` | Redis connection string |
+| `JWT_SECRET` | — | Secret for dashboard JWTs |
+| `STRIPE_WEBHOOK_SECRET` | — | Stripe webhook verification |
+| `STRIPE_SECRET_KEY` | — | Stripe secret key |
+| `LOG_LEVEL` | info | debug/info/warn/error |
 
-## Deploy
+## Pricing
 
-### Docker Compose (Recommended)
+| Tier | Price | Traces/mo | API Keys |
+|------|-------|-----------|----------|
+| Free | $0 | 10,000 | 1 |
+| Dev | $19/mo | 100,000 | 3 |
+| Startup | $79/mo | 1,000,000 | 10 |
+| Growth | $249/mo | 10,000,000 | Unlimited |
 
-```bash
-docker compose up -d
-```
-
-### Docker Only
-
-```bash
-docker build -t llm-observability-lite .
-docker run -p 8080:8080 \
-  -e API_KEYS=sk-my-key \
-  llm-observability-lite
-```
-
-### Local Development
-
-```bash
-pip install -r requirements.txt
-python main.py
-```
-
-## Architecture
-
-```
-Trace Log Request → Rate Limit Middleware → API Handler → SQLite
-                           ↓
-                    Dashboard (HTML/JS)
-```
-
-## Integrate with Your LLM App
-
-Add one line to log every LLM call:
-
-```python
-import httpx
-
-async def log_trace(trace_data: dict):
-    async with httpx.AsyncClient() as client:
-        await client.post(
-            "http://localhost:8080/api/v1/traces",
-            json=trace_data,
-            headers={"Authorization": "Bearer sk-obs-key-1"}
-        )
-
-# After each LLM call:
-await log_trace({
-    "trace_id": "unique-request-id",
-    "model": "gpt-4o-mini",
-    "provider": "openai",
-    "prompt_tokens": 100,
-    "completion_tokens": 50,
-    "total_tokens": 150,
-    "latency_ms": 450,
-    "cost_usd": 0.0003,
-    "cache_hit": False,
-    "status_code": 200,
-})
-```
+See [IDEA.md](./IDEA.md) for full business model.
 
 ## License
 
-MIT
+MIT — see [LICENSE](./LICENSE)

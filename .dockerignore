@@ -1,0 +1,50 @@
+# Git
+.git
+.gitignore
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+.env.*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.test.py
+pytest.ini
+
+# Documentation
+*.md
+!requirements.txt
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Local dev data
+*.db
+*.sqlite
+data/
+logs/
+
+# Build artifacts
+__pycache__/
+*.pyc
+*.pyo
+dist/
+build/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
